@@ -1,0 +1,98 @@
+import pygame
+from support import import_sprite_sheet # Hàm chúng ta đã viết ở bước trước
+
+class Player(pygame.sprite.Sprite):
+    def __init__(self, pos, groups, obstacle_sprites, food_sprites):
+        super().__init__(groups)
+        
+        # 1. Xử lý hình ảnh
+        self.import_assets()
+        self.status = 'down'
+        self.frame_index = 0
+        
+        self.image = self.animations[self.status][self.frame_index]
+        self.rect = self.image.get_rect(center = pos)
+
+        self.hitbox = self.rect.inflate(-2, -2)
+        # 2. Di chuyển
+        self.pos = pygame.math.Vector2(self.rect.topleft) # Vị trí thực tế của player (dùng cho di chuyển mượt mà)
+        self.direction = pygame.math.Vector2()
+        self.speed = 120 # Pixel trên giây
+        self.obstacle_sprites = obstacle_sprites
+        self.food_sprites = food_sprites
+
+    def import_assets(self):
+        # full_list chứa 16 ảnh theo thứ tự: 
+        # [D0, U0, R0, L0, D1, U1, R1, L1, D2, U2, R2, L2, D3, U3, R3, L3]
+        full_list = import_sprite_sheet('../images/player/Walk.png', 4, 4)
+        
+        # Chúng ta nhặt ảnh theo cột (Cột 0: Down, 1: Up, 2: Right, 3: Left)
+        self.animations = {
+            'down':  [full_list[i] for i in [0, 4, 8, 12]],  # Nhặt cột 0
+            'up':    [full_list[i] for i in [1, 5, 9, 13]],  # Nhặt cột 1
+            'right': [full_list[i] for i in [3, 7, 11, 15]], # Nhặt cột 2
+            'left':  [full_list[i] for i in [2, 6, 10, 14]]  # Nhặt cột 3
+        }
+
+    def input(self):
+        keys = pygame.key.get_pressed()
+        self.direction.x = 0
+        self.direction.y = 0
+
+        if keys[pygame.K_UP]:
+                self.direction.y = -1
+                self.status = 'up'
+        elif keys[pygame.K_DOWN]:
+            self.direction.y = 1
+            self.status = 'down'
+        elif keys[pygame.K_LEFT]:
+            self.direction.x = -1
+            self.status = 'left' # Khi sang trái, status PHẢI là 'left' và không bị ghi đè
+        elif keys[pygame.K_RIGHT]:
+            self.direction.x = 1
+            self.status = 'right' # Khi sang phải, status PHẢI là 'right' và không bị ghi đè
+
+    def animate(self, dt):
+    # Chỉ chạy animation khi có di chuyển
+        if self.direction.magnitude() > 0:
+            self.frame_index += 5 * dt
+            if self.frame_index >= len(self.animations[self.status]):
+                self.frame_index = 0
+        else:
+            # Nếu đứng yên, trả về frame đầu tiên của hướng đó
+            self.frame_index = 0
+            
+        self.image = self.animations[self.status][int(self.frame_index)]
+
+    def move(self, dt):
+        if self.direction.magnitude() > 0:
+            self.direction = self.direction.normalize()
+
+        # Di chuyển bằng số thực (self.pos) thay vì trực tiếp vào hitbox
+        self.pos.x += self.direction.x * self.speed * dt
+        self.hitbox.centerx = round(self.pos.x) # Cập nhật hitbox bằng số đã làm tròn
+        self.collision('horizontal')
+
+        self.pos.y += self.direction.y * self.speed * dt
+        self.hitbox.centery = round(self.pos.y)
+        self.collision('vertical')
+        
+        # Đồng bộ ảnh hiển thị
+        self.rect.center = self.hitbox.center
+
+    def collision(self, direction):
+        for sprite in self.obstacle_sprites:
+            if sprite.rect.colliderect(self.hitbox):
+                if direction == 'horizontal':
+                    if self.direction.x > 0: self.hitbox.right = sprite.rect.left
+                    if self.direction.x < 0: self.hitbox.left = sprite.rect.right
+                    self.pos.x = self.hitbox.centerx # Cập nhật lại pos thực sau va chạm
+                if direction == 'vertical':
+                    if self.direction.y > 0: self.hitbox.bottom = sprite.rect.top
+                    if self.direction.y < 0: self.hitbox.top = sprite.rect.bottom
+                    self.pos.y = self.hitbox.centery
+
+    def update(self, dt):
+        self.input()
+        self.animate(dt)
+        self.move(dt)
