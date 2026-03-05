@@ -52,3 +52,15 @@ GHOST_CONFIGS = [
 THINK_DELAY = 0.4      # Thời gian Ma suy nghĩ (giây)
 ANIMATION_SPEED = 8    # Tốc độ khung hình
 GHOST_SPEED = 75       # Tốc độ Ma di chuyển
+
+POWER_UP_DURATION = 7000 # 7 giây hiệu lực
+SCARED_SPEED = 40        # Ma đi chậm lại khi bị sợ
+POWER_UP_DURATION = 7000  # 7 giây
+GHOST_HOUSE_POS = (14, 14) # Vị trí hồi sinh của Ma
+
+
+# code/settings.py
+PLAYER_SPEED = 110
+PLAYER_ANIM_SPEED = 6
+PLAYER_PATH = '../images/player/Walk.png'
+TILE_SIZE = 16 # Đảm bảo hằng số này có trong settings

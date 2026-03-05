@@ -33,6 +33,10 @@ class Ghost(pygame.sprite.Sprite):
         self.direction = pygame.math.Vector2()
         self.speed = 70
         
+        self.scared = False
+        self.scared_timer = 0
+        self.normal_speed = 75 # Lưu lại tốc độ gốc
+
         self.player = player
         self.obstacle_sprites = obstacle_sprites
         self.walls = { (s.rect.x // TILE_SIZE, s.rect.y // TILE_SIZE) for s in obstacle_sprites 
@@ -124,13 +128,32 @@ class Ghost(pygame.sprite.Sprite):
             self.frame_index = 0
         self.image = current_animation[int(self.frame_index)]
 
+    def become_scared(self):
+        self.scared = True
+        self.status = 'dead' # Chuyển sang ảnh Dead.png như bạn đã nạp
+        self.speed = SCARED_SPEED
+        self.scared_timer = pygame.time.get_ticks()
+
+    def recover(self):
+        self.scared = False
+        self.status = 'walk'
+        self.speed = self.normal_speed
+
     def update(self, dt):
         self.timer += dt
         if self.timer >= self.recalc_delay:
             self.calculate_path()
             self.timer = 0
         
-        # Update attack/walk status based on distance to player
+        if self.scared:
+            current_time = pygame.time.get_ticks()
+            if current_time - self.scared_timer >= POWER_UP_DURATION:
+                self.recover()
+
+        if self.scared:
+            # Logic chạy trốn: Đổi mục tiêu thành một góc xa thay vì đuổi theo Player
+            target = (1, 1) # Ví dụ chạy về góc trên bên trái
+                # Update attack/walk status based on distance to player
         dist = (pygame.math.Vector2(self.player.rect.center) - pygame.math.Vector2(self.rect.center)).magnitude()
         self.status = 'attack' if dist < 40 else 'walk'
             

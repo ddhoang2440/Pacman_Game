@@ -20,6 +20,7 @@ class Game:
         }
         self.score = 0
         self.paused = False
+        self.game_over = False
         self.nodes_expanded = 0
         self.path_cost = 0
         self.exec_time = 0.0
@@ -34,7 +35,7 @@ class Game:
         # Khởi tạo rect cho nút pause
         self.pause_rect = pygame.Rect(MAZE_VISIBLE_WIDTH + 40, 580, 220, 100)
 
-        # Nhóm quản lý Sprite
+        # Nhóm quản lý sprite
         self.visible_sprites = pygame.sprite.Group()
         self.obstacle_sprites = pygame.sprite.Group()
         self.food_sprites = pygame.sprite.Group()
@@ -206,7 +207,7 @@ class Game:
 
         # --- 4. KHỐI THÔNG SỐ AI (DIAGNOSTICS - LẤP ĐẦY PHẦN TRỐNG) ---
         # Khu vực này cực kỳ quan trọng để ghi điểm đồ án AI
-        diag_card = pygame.Rect(sidebar_x + 20, 400, SIDEBAR_WIDTH - 40, 150)
+        diag_card = pygame.Rect(sidebar_x + 20, 400, SIDEBAR_WIDTH - 40, 160)
         pygame.draw.rect(self.display_surface, '#1e1e1e', diag_card, border_radius=12)
         # Viền mỏng màu xanh bao quanh bảng thông số
         pygame.draw.rect(self.display_surface, '#00BFFF', diag_card, 1, border_radius=12)
@@ -217,9 +218,12 @@ class Game:
         # Các thông số kỹ thuật (Lấy từ biến hệ thống của bạn)
         # Nếu chưa có biến, mặc định sẽ hiện là 0
         metrics = [
+            f"Algorithm: {self.selected_algo}",
             f"Nodes Expanded: {self.nodes_expanded}",
             f"Path Cost: {self.path_cost}",
-            f"Runtime: {self.exec_time:.4f}s"
+            f"Runtime: {self.exec_time:.4f}s",
+            # Sửa dòng status để hiện màu đỏ khi thua
+            # f"Status: {'LOST - PRESS R' if self.game_over else self.search_status}" 
         ]
 
         for i, text in enumerate(metrics):
@@ -238,7 +242,16 @@ class Game:
         # Gợi ý phím tắt dưới cùng để giao diện thêm đầy đặn
         hint_text = pygame.font.Font(None, 20).render('Press R to Reset Level', True, '#555555')
         self.display_surface.blit(hint_text, (sidebar_x + 65, 715))
-        
+    
+    def check_collision(self):
+        if not self.game_over:
+            # Kiểm tra va chạm giữa sprite player và nhóm ghost_group
+            # False nghĩa là không xóa con ma khi va chạm
+            if pygame.sprite.spritecollide(self.player, self.ghost_group, False):
+                self.game_over = True
+                self.search_status = "GAME OVER!"
+                print("Bạn đã va chạm với quái vật! Thua cuộc.")
+
     def run(self):
         while True:
             dt = self.clock.tick(60) / 1000
@@ -262,10 +275,12 @@ class Game:
                                     self.monitored_ghost = g
 
             # Logic Update
-            if not self.paused:
+            if not self.paused and not self.game_over:
                 self.internal_surf.fill(BG_COLOR)
                 self.visible_sprites.update(dt) # Cập nhật di chuyển Ma (dùng DT cho mượt)
                 
+                self.check_collision() # Kiểm tra va chạm giữa Player và Ghosts
+
                 if self.monitored_ghost:
                     # Lấy thông số từ con ma đang được chọn
                     nodes, cost, time_val = self.monitored_ghost.calculate_path()

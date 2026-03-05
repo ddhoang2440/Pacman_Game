@@ -122,7 +122,8 @@ class Player(pygame.sprite.Sprite):
                 self.power_up() # Tạm thời in ra logic kích hoạt sức mạnh
 
     def power_up(self):
-        print("Power-up activated! (Implement your logic here)")
+        print("Power-up activated! (Logic to be implemented)")
+
 
     def update(self, dt):
         self.input()
