@@ -2,7 +2,7 @@ import pygame
 from support import import_sprite_sheet # Hàm chúng ta đã viết ở bước trước
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, pos, groups, obstacle_sprites, food_sprites):
+    def __init__(self, pos, groups, obstacle_sprites, food_sprites, portals, change_score):
         super().__init__(groups)
         
         # 1. Xử lý hình ảnh
@@ -15,11 +15,13 @@ class Player(pygame.sprite.Sprite):
 
         self.hitbox = self.rect.inflate(-2, -2)
         # 2. Di chuyển
-        self.pos = pygame.math.Vector2(self.rect.topleft) # Vị trí thực tế của player (dùng cho di chuyển mượt mà)
+        self.pos = pygame.math.Vector2(self.rect.center) # Vị trí thực tế của player (dùng cho di chuyển mượt mà)
         self.direction = pygame.math.Vector2()
         self.speed = 120 # Pixel trên giây
         self.obstacle_sprites = obstacle_sprites
         self.food_sprites = food_sprites
+        self.portals = portals
+        self.change_score = change_score
 
     def import_assets(self):
         # full_list chứa 16 ảnh theo thứ tự: 
@@ -92,7 +94,39 @@ class Player(pygame.sprite.Sprite):
                     if self.direction.y < 0: self.hitbox.top = sprite.rect.bottom
                     self.pos.y = self.hitbox.centery
 
+    def teleport(self): 
+        # Lấy tọa độ các cổng
+        left_p = self.portals['portal_left']
+        right_p = self.portals['portal_right']
+
+        # Nếu đi quá xa về bên trái cổng trái -> Nhảy sang cổng phải
+        if self.hitbox.right < left_p['x']:
+            self.pos.x = right_p['x']
+            self.hitbox.centerx = round(self.pos.x)
+            
+        # Nếu đi quá xa về bên phải cổng phải -> Nhảy sang cổng trái
+        elif self.hitbox.left > right_p['x'] + 16: # 16 là độ rộng tile
+            self.pos.x = left_p['x']
+            self.hitbox.centerx = round(self.pos.x)
+
+    def eat(self):
+    # Kiểm tra va chạm giữa Player (self) và nhóm food_sprites
+        # dokill=True giúp xóa ngay sprite food đó khi va chạm
+        collided_sprites = pygame.sprite.spritecollide(self, self.food_sprites, True)
+        
+        for sprite in collided_sprites:
+            if sprite.sprite_type == 'food':
+                self.change_score(10) # Mỗi hạt đậu xanh 10 điểm
+            elif sprite.sprite_type == 'power':
+                self.change_score(50) # Viên năng lượng to thì 50 điểm
+                self.power_up() # Tạm thời in ra logic kích hoạt sức mạnh
+
+    def power_up(self):
+        print("Power-up activated! (Implement your logic here)")
+
     def update(self, dt):
         self.input()
         self.animate(dt)
         self.move(dt)
+        self.teleport()
+        self.eat()
