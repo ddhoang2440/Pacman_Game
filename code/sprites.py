@@ -1,4 +1,3 @@
-# code/sprites.py
 import pygame
 from settings import *
 from algo import *
@@ -19,7 +18,7 @@ class Ghost(pygame.sprite.Sprite):
         self.folder_path = folder_path
         self.algo_type = algo_type
         
-        # --- ANIMATION SETUP ---
+        # ANIMATION SETUP
         self.import_assets()
         self.status = 'walk'
         self.facing = 'down' # Hướng mặc định
@@ -29,7 +28,7 @@ class Ghost(pygame.sprite.Sprite):
         self.image = self.animations[self.status][self.facing][self.frame_index]
         self.rect = self.image.get_rect(topleft = pos)
         
-        # --- SMOOTH MOVEMENT ---
+        # SMOOTH MOVEMENT
         self.pos = pygame.math.Vector2(self.rect.topleft)
         self.direction = pygame.math.Vector2()
         self.speed = 70
@@ -46,7 +45,7 @@ class Ghost(pygame.sprite.Sprite):
     def import_assets(self):
         self.animations = {'walk': {}, 'attack': {}, 'dead': {}}
         
-        # 1. Nạp Walk (Giả sử Walk vẫn là mảng 4x4 giống Player)
+        # 1. Walk animation
         walk_frames = import_sprite_sheet(f'{self.folder_path}/Walk.png', 4, 4)
         self.animations['walk'] = {
             'down':  [walk_frames[i] for i in [0, 4, 8, 12]],
@@ -55,17 +54,13 @@ class Ghost(pygame.sprite.Sprite):
             'right': [walk_frames[i] for i in [3, 7, 11, 15]]
         }
 
-        # 2. Nạp Attack (Mảng 1 chiều: 0-Down, 1-Up, 2-Left, 3-Right)
-        # Vì chỉ có 1 frame mỗi hướng, mình để nó vào list [frame]
-        atk_frames = import_sprite_sheet(f'{self.folder_path}/Attack.png', 1, 4)
+        # 2. Attack animation
+        a_f = import_sprite_sheet(f'{self.folder_path}/Attack.png', 1, 4)
         self.animations['attack'] = {
-            'down':  [atk_frames[0]],
-            'up':    [atk_frames[1]],
-            'left':  [atk_frames[2]],
-            'right': [atk_frames[3]]
+            'down': [a_f[0]], 'up': [a_f[1]], 'left': [a_f[2]], 'right': [a_f[3]]
         }
 
-        # 3. Nạp Dead
+        # 3. Dead animation
         try:
             dead_frames = import_sprite_sheet(f'{self.folder_path}/Dead.png', 1, 4)
             self.animations['dead'] = {'down': [dead_frames[0]], 'up': [dead_frames[1]], 
@@ -79,13 +74,12 @@ class Ghost(pygame.sprite.Sprite):
         
         in_house = (11 <= curr_grid[0] <= 17) and (12 <= curr_grid[1] <= 16)
         target = (14, 11) if in_house else player_grid
-        
-        # Fix lỗi Crash: Luôn trả về 0,0,0 nếu không hợp lệ
+
         if target in self.walls: 
             self.path = []
             return 0, 0, 0 
 
-        # Gọi thuật toán và đảm bảo không trả về None
+        # Algorithm selection
         res = None
         if in_house: res = get_path_bfs(curr_grid, target, self.walls)
         else:
@@ -103,7 +97,7 @@ class Ghost(pygame.sprite.Sprite):
         if len(self.path) > 1:
             target_pos = pygame.math.Vector2(self.path[1][0] * TILE_SIZE, self.path[1][1] * TILE_SIZE)
             
-            # Tính hướng di chuyển
+            # Caculate direction towards the next tile in the path
             if (target_pos - self.pos).magnitude() > 2:
                 self.direction = (target_pos - self.pos).normalize()
             else:
@@ -112,12 +106,11 @@ class Ghost(pygame.sprite.Sprite):
         else:
             self.direction = pygame.math.Vector2()
 
-        # Di chuyển thực tế
+        # Update position based on direction and speed
         self.pos += self.direction * self.speed * dt
         self.rect.topleft = (round(self.pos.x), round(self.pos.y))
 
-        # --- CẬP NHẬT HƯỚNG NHÌN (FACING) ---
-        # Chỉ cập nhật khi ma thực sự đang di chuyển
+        # Update facing direction for animation
         if self.direction.magnitude() > 0:
             if abs(self.direction.x) > abs(self.direction.y):
                 self.facing = 'right' if self.direction.x > 0 else 'left'
@@ -137,7 +130,7 @@ class Ghost(pygame.sprite.Sprite):
             self.calculate_path()
             self.timer = 0
         
-        # Cập nhật Attack status
+        # Update attack/walk status based on distance to player
         dist = (pygame.math.Vector2(self.player.rect.center) - pygame.math.Vector2(self.rect.center)).magnitude()
         self.status = 'attack' if dist < 40 else 'walk'
             

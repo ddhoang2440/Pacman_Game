@@ -11,7 +11,7 @@ def import_sprite_sheet(path, rows, cols):
         for col in range(cols):
             x = col * sprite_width
             y = row * sprite_height
-            # Cắt ảnh nhỏ từ sheet lớn
+            # Cut the sprite and create a new surface for it
             temp_surface = pygame.Surface((sprite_width, sprite_height), pygame.SRCALPHA)
             temp_surface.blit(full_sheet, (0, 0), pygame.Rect(x, y, sprite_width, sprite_height))
             frames.append(temp_surface)

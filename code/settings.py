@@ -31,3 +31,24 @@ CARD_BG = '#1c1c1c'
 CARD_BORDER = '#2e2e2e'
 TEXT_DIM = '#aaaaaa'
 ACCENT = '#00BFFF'
+
+# --- UI & Colors ---
+SIDEBAR_BG = '#121212'
+CARD_BG = '#1e1e1e'
+UI_BORDER = '#333333'
+NEON_BLUE = '#00BFFF'
+GOLD = '#FFD700'
+
+# --- Ghost Configs ---
+# Gom folder path và thuật toán vào một chỗ
+GHOST_CONFIGS = [
+    {'name': 'EggGirl',    'path': '../images/enemies/EggGirl',    'algo': 'BFS'},
+    {'name': 'Eskimo',     'path': '../images/enemies/Eskimo',     'algo': 'Alpha-Beta'},
+    {'name': 'GoldStatue', 'path': '../images/enemies/GoldStatue', 'algo': 'A*'},
+    {'name': 'Cavegirl',   'path': '../images/enemies/Cavegirl',   'algo': 'Minimax'}
+]
+
+# --- AI & Animation Settings ---
+THINK_DELAY = 0.4      # Thời gian Ma suy nghĩ (giây)
+ANIMATION_SPEED = 8    # Tốc độ khung hình
+GHOST_SPEED = 75       # Tốc độ Ma di chuyển
