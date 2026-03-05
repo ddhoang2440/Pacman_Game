@@ -47,10 +47,12 @@ class Game:
                 for x, y, surf in layer.tiles():
                     pos = (x * TILE_SIZE, y * TILE_SIZE)
                     groups = [self.visible_sprites]
-                    
                     if layer.name == 'Walls':
                         groups.append(self.obstacle_sprites)
                         Tile(pos, groups, surf, 'wall')
+                    elif layer.name == 'Door':
+                        groups.append(self.obstacle_sprites) 
+                        Tile(pos, groups, surf, 'door')
                     elif layer.name == 'Power':
                         groups.append(self.food_sprites)
                         Tile(pos, groups, surf, 'power')
