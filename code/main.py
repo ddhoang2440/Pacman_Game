@@ -89,10 +89,10 @@ class Game:
 
         self.ghost_group = pygame.sprite.Group()
         configs = [
-            {'name': 'Blinky', 'color': 'red',    'algo': 'BFS'},
-            {'name': 'Pinky',  'color': 'pink',   'algo': 'DFS'},
-            {'name': 'Inky',   'color': 'cyan',   'algo': 'A*'},
-            {'name': 'Clyde',  'color': 'orange', 'algo': 'Minimax'}
+            {'name': 'EggGirl',    'path': '../images/enemies/EggGirl',    'algo': 'BFS'},
+            {'name': 'Eskimo',     'path': '../images/enemies/Eskimo',     'algo': 'Alpha-Beta'},
+            {'name': 'GoldStatue', 'path': '../images/enemies/GoldStatue', 'algo': 'A*'},
+            {'name': 'Cavegirl',   'path': '../images/enemies/Cavegirl',   'algo': 'Minimax'}
         ]
     
         ghost_layer = self.tmx_data.get_layer_by_name('Ghost')
@@ -107,16 +107,14 @@ class Game:
                     self.obstacle_sprites, 
                     self.player, 
                     cfg['name'],   # Tham số thứ 5
-                    cfg['color'],  # Tham số thứ 6
+                    cfg['path'], # Truyền đường dẫn folder  
                     cfg['algo']    # Tham số thứ 7
                 )
-                self.ghost_list.append(ghost) # PHẢI THỤT VÀO TRONG VÒNG LẶP
+                self.ghost_list.append(ghost) 
             
-        # Kiểm tra nếu danh sách có ma thì mới gán monitored_ghost
         if self.ghost_list:
             self.monitored_ghost = self.ghost_list[0]
-        else:
-            self.monitored_ghost = None
+            self.blinky = self.ghost_list[0]
 
     def change_score(self, amount):
         self.score += amount
@@ -269,17 +267,21 @@ class Game:
             # Logic Update
             if not self.paused:
                 self.internal_surf.fill(BG_COLOR)
-                self.visible_sprites.update(dt)
-                # --- CẬP NHẬT THÔNG SỐ AI TỪ BLINKY ---
-                # Gọi hàm tìm đường và lấy dữ liệu
-                if self.blinky:
-                        nodes, cost, time_val = self.blinky.calculate_path()
-                        self.nodes_visited = nodes
-                        self.path_len = cost
-                        self.search_time = time_val / 1000 
-                        self.current_node = (self.blinky.rect.x // TILE_SIZE, self.blinky.rect.y // TILE_SIZE)
-                        self.goal_node = (self.player.rect.x // TILE_SIZE, self.player.rect.y // TILE_SIZE)
-                        self.search_status = "Path Found!" if cost > 0 else "Searching..."
+                self.visible_sprites.update(dt) # Cập nhật di chuyển Ma (dùng DT cho mượt)
+                
+                if self.monitored_ghost:
+                    # Lấy thông số từ con ma đang được chọn
+                    nodes, cost, time_val = self.monitored_ghost.calculate_path()
+                    
+                    # Đổ dữ liệu vào các biến UI
+                    self.nodes_expanded = nodes
+                    self.path_cost = cost
+                    self.exec_time = time_val
+                    
+                    # Cập nhật tọa độ grid thực tế để hiển thị
+                    self.current_node = (int(self.monitored_ghost.pos.x // TILE_SIZE), int(self.monitored_ghost.pos.y // TILE_SIZE))
+                    self.goal_node = (self.player.rect.x // TILE_SIZE, self.player.rect.y // TILE_SIZE)
+                    self.search_status = "Path Found!" if cost > 0 else "Searching..."
             # Rendering
             self.display_surface.fill('#1a1a1a') # Màu nền bao quanh
 
