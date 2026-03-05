@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDEs
+.vscode/
+.idea/
+
+# Hệ thống
+.DS_Store
+Thumbs.db
+
+# Tiled
+*.tiled-project
+*.tiled-session

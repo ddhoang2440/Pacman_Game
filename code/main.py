@@ -12,36 +12,40 @@ class Game:
         self.clock = pygame.time.Clock()
         self.tmx_data = load_pygame(MAP_PATH)
         
-        # UI State
-        self.font = pygame.font.Font(None, 50)
+        # --- TỐI ƯU 1: CACHE FONTS (Tránh lag do nạp font liên tục) ---
+        self.font_large = pygame.font.Font(None, 45)
+        self.font_medium = pygame.font.Font(None, 32)
+        self.font_diag = pygame.font.Font(None, 24)
+        self.font_button = pygame.font.Font(None, 28)
+
+        # UI State & AI Metrics (Đã đồng bộ tên biến)
         self.score = 0
         self.paused = False
+        self.selected_algo = 'BFS'
         self.nodes_expanded = 0
         self.path_cost = 0
         self.exec_time = 0.0
-        self.frontier_size = 0
-        self.selected_algo = 'BFS'
-        self.algo_buttons = []
-        self.current_node = (12, 8)
-        self.goal_node = (3, 17)
-        self.heuristic_val = 5
-        self.search_status = "Searching..."
+        self.heuristic_val = 0
+        self.current_node = (0, 0)
+        self.goal_node = (0, 0)
+        self.search_status = "Waiting..."
         
-        self.blinky = None
-        # Khởi tạo rect cho nút pause
-        self.pause_rect = pygame.Rect(MAZE_VISIBLE_WIDTH + 40, 580, 220, 100)
-        # Khởi tạo rect cho nút pause để tránh lỗi click trước khi vẽ
-        self.pause_rect = pygame.Rect(MAZE_VISIBLE_WIDTH + 40, 580, 220, 100)
+        self.monitored_ghost = None
+        self.algo_buttons = []
+        
+        # Khởi tạo rect cho nút pause (Đã xóa dòng trùng lặp)
+        self.pause_rect = pygame.Rect(MAZE_VISIBLE_WIDTH + 40, 620, 240, 85)
 
         # Nhóm quản lý Sprite
         self.visible_sprites = pygame.sprite.Group()
         self.obstacle_sprites = pygame.sprite.Group()
         self.food_sprites = pygame.sprite.Group()
+        self.ghost_group = pygame.sprite.Group()
         
         self.setup()
 
     def setup(self):
-        # 1. Duyệt các Layer gạch (Tile Layers)
+        # 1. Duyệt các Layer gạch
         for layer in self.tmx_data.visible_layers:
             if hasattr(layer, 'data'): 
                 for x, y, surf in layer.tiles():
@@ -59,189 +63,92 @@ class Game:
                     elif layer.name == 'Background':
                         Tile(pos, groups, surf, 'bg')
 
-        # 2. Nạp dữ liệu Cổng (Portals)
-        portal_layer = self.tmx_data.get_layer_by_name('Portals')
-        self.portals = {}
-        for obj in portal_layer:
-            self.portals[obj.name] = {'x': obj.x, 'y': obj.y}
+        # 2. Portals
+        self.portals = {obj.name: {'x': obj.x, 'y': obj.y} for obj in self.tmx_data.get_layer_by_name('Portals')}
 
-        # 3. Nạp Vật phẩm lớn (BigItems)
-        try:
-            big_items_layer = self.tmx_data.get_layer_by_name('BigItems')
-            for obj in big_items_layer:
-                pos = (obj.x, obj.y)
-                groups = [self.visible_sprites, self.food_sprites]
-                Tile(pos, groups, obj.image, 'food')
-        except ValueError:
-            print("Cảnh báo: Không tìm thấy layer BigItems!")
-
-        # 4. Khởi tạo Player
+        # 3. Khởi tạo Player
         player_layer = self.tmx_data.get_layer_by_name('Player')
         for obj in player_layer:
-            self.player = Player(
-                pos = (obj.x, obj.y), 
-                groups = self.visible_sprites, 
-                obstacle_sprites = self.obstacle_sprites,
-                food_sprites = self.food_sprites,
-                portals = self.portals,
-                change_score = self.change_score                                          
-            )
+            self.player = Player((obj.x, obj.y), self.visible_sprites, self.obstacle_sprites, self.food_sprites, self.portals, self.change_score)
 
-        self.ghost_group = pygame.sprite.Group()
+        # 4. Khởi tạo 4 Ghost theo yêu cầu nhân vật mới
         configs = [
             {'name': 'EggGirl',    'path': '../images/enemies/EggGirl',    'algo': 'BFS'},
             {'name': 'Eskimo',     'path': '../images/enemies/Eskimo',     'algo': 'Alpha-Beta'},
             {'name': 'GoldStatue', 'path': '../images/enemies/GoldStatue', 'algo': 'A*'},
             {'name': 'Cavegirl',   'path': '../images/enemies/Cavegirl',   'algo': 'Minimax'}
         ]
-    
+        
         ghost_layer = self.tmx_data.get_layer_by_name('Ghost')
         spawn_points = [(obj.x, obj.y) for obj in ghost_layer]
 
         self.ghost_list = []
         for i, cfg in enumerate(configs):
             if i < len(spawn_points):
-                ghost = Ghost(
-                    spawn_points[i], 
-                    [self.visible_sprites, self.ghost_group], 
-                    self.obstacle_sprites, 
-                    self.player, 
-                    cfg['name'],   # Tham số thứ 5
-                    cfg['path'], # Truyền đường dẫn folder  
-                    cfg['algo']    # Tham số thứ 7
-                )
-                self.ghost_list.append(ghost) 
+                ghost = Ghost(spawn_points[i], [self.visible_sprites, self.ghost_group], 
+                             self.obstacle_sprites, self.player, cfg['name'], cfg['path'], cfg['algo'])
+                self.ghost_list.append(ghost)
             
         if self.ghost_list:
             self.monitored_ghost = self.ghost_list[0]
-            self.blinky = self.ghost_list[0]
 
     def change_score(self, amount):
         self.score += amount
 
-    def draw_diagnostics(self, x_pos, y_pos):
-        # 1. Khung nền cho bảng chẩn đoán
-        diag_rect = pygame.Rect(x_pos, y_pos, 230, 220)
-        pygame.draw.rect(self.display_surface, '#1e1e1e', diag_rect, border_radius=12)
-        pygame.draw.rect(self.display_surface, '#333333', diag_rect, 2, border_radius=12) # Viền nhẹ
-
-        # 2. Tiêu đề bảng
-        header_font = pygame.font.Font(None, 30)
-        title_surf = header_font.render("AI DIAGNOSTICS", True, '#00BFFF') # Màu xanh Neon
-        self.display_surface.blit(title_surf, (x_pos + 15, y_pos + 15))
-        
-        # 3. Danh sách thông số (Dùng font nhỏ hơn, kiểu Monospace nhìn cho "tech")
-        info_font = pygame.font.Font(None, 28)
-        metrics = [
-            f"Algo: {self.selected_algo}",
-            f"Nodes: {self.nodes_expanded}",
-            f"Path Cost: {self.path_cost}",
-            f"Frontier: {self.frontier_size}",
-            f"Time: {self.exec_time:.3f} ms"
-        ]
-
-        for i, text in enumerate(metrics):
-            surf = info_font.render(text, True, 'white')
-            self.display_surface.blit(surf, (x_pos + 20, y_pos + 55 + (i * 30)))
-    def draw_controls(self, x_pos, y_pos):
-        # Thêm hướng dẫn phím tắt ở dưới cùng để lấp khoảng trống cuối
-        font_small = pygame.font.Font(None, 22)
-        controls = [
-            "[SPACE] Start/Pause",
-            "[R] Reset Level",
-            "[ESC] Quit Game"
-        ]
-        for i, text in enumerate(controls):
-            surf = font_small.render(text, True, '#888888')
-            self.display_surface.blit(surf, (x_pos, y_pos + (i * 20)))
-
     def draw_sidebar(self):
-        # --- 1. THIẾT LẬP NỀN VÀ ĐƯỜNG CHIA ---
         sidebar_x = MAZE_VISIBLE_WIDTH
-        sidebar_rect = pygame.Rect(sidebar_x, 0, SIDEBAR_WIDTH, SCREEN_HEIGHT)
-        # Nền Sidebar màu xám cực đậm để làm nổi bật các Card
-        pygame.draw.rect(self.display_surface, '#121212', sidebar_rect) 
-        # Đường kẻ phân cách Maze và UI
+        # Nền Sidebar
+        pygame.draw.rect(self.display_surface, '#121212', (sidebar_x, 0, SIDEBAR_WIDTH, SCREEN_HEIGHT))
         pygame.draw.line(self.display_surface, '#333333', (sidebar_x, 0), (sidebar_x, SCREEN_HEIGHT), 2)
 
-        # --- 2. KHỐI ĐIỂM SỐ (TOTAL SCORE CARD) ---
-        # Thiết kế dạng thẻ (Card) bo góc
-        score_card = pygame.Rect(sidebar_x + 20, 30, SIDEBAR_WIDTH - 40, 110)
+        # --- CARD 1: TOTAL SCORE (Y=20) ---
+        score_card = pygame.Rect(sidebar_x + 20, 20, SIDEBAR_WIDTH - 40, 100)
         pygame.draw.rect(self.display_surface, '#1e1e1e', score_card, border_radius=12)
-        
-        # Tiêu đề Score màu xám nhạt
-        score_label = self.font.render('TOTAL SCORE', True, '#888888')
-        self.display_surface.blit(score_label, (sidebar_x + 40, 45))
-        
-        # Số điểm định dạng 6 chữ số, màu vàng rực rỡ
-        score_str = f"{self.score:06}"
-        score_num = self.font.render(score_str, True, '#FFD700') 
-        num_rect = score_num.get_rect(midleft=(sidebar_x + 40, 100))
-        self.display_surface.blit(score_num, num_rect)
+        self.display_surface.blit(self.font_medium.render('TOTAL SCORE', True, '#888888'), (sidebar_x + 40, 35))
+        score_num = self.font_large.render(f"{self.score:06}", True, '#FFD700') 
+        self.display_surface.blit(score_num, (sidebar_x + 40, 70))
 
-        # --- 3. KHỐI THUẬT TOÁN (ALGORITHMS GRID) ---
-        algo_label = self.font.render('ALGORITHMS', True, '#00BFFF') # Màu xanh Neon chủ đạo
-        self.display_surface.blit(algo_label, (sidebar_x + 30, 160))
-        
-        self.algo_buttons = [] # Lưu Rect để bắt sự kiện click trong hàm run()
-        algos = ['BFS', 'DFS', 'UCS', 'A*', 'IDS', 'GBFS']
-        
+        # --- CARD 2: ALGORITHMS (Y=140) ---
+        self.display_surface.blit(self.font_medium.render('ALGORITHMS', True, '#00BFFF'), (sidebar_x + 30, 140))
+        self.algo_buttons = []
+        algos = ['BFS', 'Alpha-Beta', 'A*', 'Minimax']
         for i, name in enumerate(algos):
-            col = i % 2
-            row = i // 2
-            x = sidebar_x + 30 + (col * 105)
-            y = 205 + (row * 65)
-            
-            btn_rect = pygame.Rect(x, y, 95, 50)
+            col, row = i % 2, i // 2
+            btn_rect = pygame.Rect(sidebar_x + 30 + (col * 130), 185 + (row * 75), 120, 60)
             self.algo_buttons.append((btn_rect, name))
             
-            # Trạng thái Selected (Nền xanh) vs Unselected (Viền xám)
-            if self.selected_algo == name:
-                pygame.draw.rect(self.display_surface, '#00BFFF', btn_rect, border_radius=8)
-                text_color = 'black'
-            else:
-                pygame.draw.rect(self.display_surface, '#333333', btn_rect, 2, border_radius=8)
-                text_color = 'white'
-            
-            # Dùng font nhỏ hơn một chút cho các nút bấm
-            btn_font = pygame.font.Font(None, 32)
-            algo_text = btn_font.render(name, True, text_color)
-            self.display_surface.blit(algo_text, algo_text.get_rect(center=btn_rect.center))
+            color = '#00BFFF' if self.selected_algo == name else '#333333'
+            text_color = 'black' if self.selected_algo == name else 'white'
+            pygame.draw.rect(self.display_surface, color, btn_rect, border_radius=8)
+            txt_surf = self.font_button.render(name, True, text_color)
+            self.display_surface.blit(txt_surf, txt_surf.get_rect(center=btn_rect.center))
 
-        # --- 4. KHỐI THÔNG SỐ AI (DIAGNOSTICS - LẤP ĐẦY PHẦN TRỐNG) ---
-        # Khu vực này cực kỳ quan trọng để ghi điểm đồ án AI
-        diag_card = pygame.Rect(sidebar_x + 20, 400, SIDEBAR_WIDTH - 40, 150)
+        # --- CARD 3: AI DIAGNOSTICS (Y=380) ---
+        diag_card = pygame.Rect(sidebar_x + 20, 380, SIDEBAR_WIDTH - 40, 220)
         pygame.draw.rect(self.display_surface, '#1e1e1e', diag_card, border_radius=12)
-        # Viền mỏng màu xanh bao quanh bảng thông số
         pygame.draw.rect(self.display_surface, '#00BFFF', diag_card, 1, border_radius=12)
+        self.display_surface.blit(self.font_medium.render('AI DIAGNOSTICS', True, '#00BFFF'), (sidebar_x + 35, 395))
 
-        diag_label = pygame.font.Font(None, 28).render('AI DIAGNOSTICS', True, '#00BFFF')
-        self.display_surface.blit(diag_label, (sidebar_x + 35, 415))
-
-        # Các thông số kỹ thuật (Lấy từ biến hệ thống của bạn)
-        # Nếu chưa có biến, mặc định sẽ hiện là 0
         metrics = [
-            f"Nodes Expanded: {getattr(self, 'nodes_visited', 0)}",
-            f"Path Cost: {getattr(self, 'path_len', 0)}",
-            f"Runtime: {getattr(self, 'search_time', 0.0):.4f}s"
+            f"Algorithm: {self.selected_algo}",
+            f"Nodes Expanded: {self.nodes_expanded}",
+            f"Path Cost: {self.path_cost}",
+            f"Runtime: {self.exec_time:.4f}s",
+            f"Heuristic: {self.heuristic_val}",
+            f"Current: {self.current_node} | Goal: {self.goal_node}",
+            f"Status: {self.search_status}"
         ]
-
         for i, text in enumerate(metrics):
-            metric_surf = pygame.font.Font(None, 24).render(text, True, '#AAAAAA')
-            self.display_surface.blit(metric_surf, (sidebar_x + 35, 450 + (i * 28)))
+            color = 'white' if "Status" not in text else '#00FF00'
+            self.display_surface.blit(self.font_diag.render(text, True, color), (sidebar_x + 35, 435 + i * 22))
 
-        # --- 5. NÚT PAUSE (DƯỚI CÙNG) ---
-        # Nền màu cam đậm (Orange Red) nổi bật cho nút điều khiển chính
-        pause_btn_color = '#FF4500' if not self.paused else '#32CD32' 
-        pygame.draw.rect(self.display_surface, pause_btn_color, self.pause_rect, border_radius=15)
-        
-        pause_text = 'PAUSE' if not self.paused else 'RESUME'
-        pause_surf = self.font.render(pause_text, True, 'white')
+        # --- CARD 4: CONTROLS (Y=620) ---
+        btn_color = '#FF4500' if not self.paused else '#32CD32'
+        pygame.draw.rect(self.display_surface, btn_color, self.pause_rect, border_radius=15)
+        txt = 'PAUSE' if not self.paused else 'RESUME'
+        pause_surf = self.font_medium.render(txt, True, 'white')
         self.display_surface.blit(pause_surf, pause_surf.get_rect(center=self.pause_rect.center))
 
-        # Gợi ý phím tắt dưới cùng để giao diện thêm đầy đặn
-        hint_text = pygame.font.Font(None, 20).render('Press R to Reset Level', True, '#555555')
-        self.display_surface.blit(hint_text, (sidebar_x + 65, 715))
     def run(self):
         while True:
             dt = self.clock.tick(60) / 1000
@@ -251,50 +158,47 @@ class Game:
                     sys.exit()
                 
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    # Kiểm tra click nút Pause
                     if self.pause_rect.collidepoint(event.pos):
                         self.paused = not self.paused
                     
-                    # --- THÊM: Kiểm tra click chọn thuật toán ---
                     for btn_rect, algo_name in self.algo_buttons:
                         if btn_rect.collidepoint(event.pos):
                             self.selected_algo = algo_name
-                            # Tìm con ma tương ứng với thuật toán đó để hiển thị thông số
+                            # Chuyển monitored_ghost sang con ma dùng thuật toán tương ứng
                             for g in self.ghost_list:
                                 if g.algo_type == algo_name:
                                     self.monitored_ghost = g
 
-            # Logic Update
             if not self.paused:
                 self.internal_surf.fill(BG_COLOR)
-                self.visible_sprites.update(dt) # Cập nhật di chuyển Ma (dùng DT cho mượt)
+                self.visible_sprites.update(dt) 
                 
                 if self.monitored_ghost:
-                    # Lấy thông số từ con ma đang được chọn
-                    nodes, cost, time_val = self.monitored_ghost.calculate_path()
-                    
-                    # Đổ dữ liệu vào các biến UI
-                    self.nodes_expanded = nodes
-                    self.path_cost = cost
-                    self.exec_time = time_val
-                    
-                    # Cập nhật tọa độ grid thực tế để hiển thị
-                    self.current_node = (int(self.monitored_ghost.pos.x // TILE_SIZE), int(self.monitored_ghost.pos.y // TILE_SIZE))
-                    self.goal_node = (self.player.rect.x // TILE_SIZE, self.player.rect.y // TILE_SIZE)
-                    self.search_status = "Path Found!" if cost > 0 else "Searching..."
+                    # TỐI ƯU 2: Lấy dữ liệu trực tiếp từ monitored_ghost
+                    path_data = self.monitored_ghost.calculate_path()
+                    if path_data and len(path_data) == 3:
+                        nodes, cost, time_val = path_data
+                        self.nodes_expanded = nodes
+                        self.path_cost = cost
+                        self.exec_time = time_val / 1000 
+                        
+                        # Thêm thông số tọa độ thực tế
+                        self.current_node = (int(self.monitored_ghost.pos.x // TILE_SIZE), int(self.monitored_ghost.pos.y // TILE_SIZE))
+                        self.goal_node = (self.player.rect.x // TILE_SIZE, self.player.rect.y // TILE_SIZE)
+                        self.search_status = "In Pursuit!" if cost > 0 else "Path Blocked"
+                        
+                        # Gán heuristic (ví dụ Manhattan cho A*)
+                        if self.selected_algo == 'A*':
+                            self.heuristic_val = abs(self.current_node[0]-self.goal_node[0]) + abs(self.current_node[1]-self.goal_node[1])
+                        else:
+                            self.heuristic_val = 0
+
             # Rendering
-            self.display_surface.fill('#1a1a1a') # Màu nền bao quanh
-
-            # 1. Vẽ Maze lên mặt phẳng nội bộ
+            self.display_surface.fill('#1a1a1a')
             self.visible_sprites.draw(self.internal_surf)
-
-            # 2. Phóng to Maze dán sang bên trái
             scaled_maze = pygame.transform.scale(self.internal_surf, (MAZE_VISIBLE_WIDTH, SCREEN_HEIGHT))
             self.display_surface.blit(scaled_maze, (0, 0))
-
-            # 3. Vẽ Sidebar thông tin bên phải
             self.draw_sidebar()
-
             pygame.display.update()
 
 if __name__ == '__main__':

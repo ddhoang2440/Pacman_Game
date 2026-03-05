@@ -25,3 +25,9 @@ ALGO_LIST = ['BFS', 'DFS', 'UCS', 'A*', 'IDS', 'GBFS']
 # Màu sắc bổ sung
 ALGO_BOX_COLOR = '#252525' 
 SELECTED_COLOR = 'yellow'
+ACCENT = '#00BFFF'
+SIDEBAR_BG = '#0f0f0f'
+CARD_BG = '#1c1c1c'
+CARD_BORDER = '#2e2e2e'
+TEXT_DIM = '#aaaaaa'
+ACCENT = '#00BFFF'
