@@ -17,7 +17,7 @@ class Player(pygame.sprite.Sprite):
         # 2. Di chuyển
         self.pos = pygame.math.Vector2(self.rect.center) # Vị trí thực tế của player (dùng cho di chuyển mượt mà)
         self.direction = pygame.math.Vector2()
-        self.speed = 120 # Pixel trên giây
+        self.speed = 100 # Pixel trên giây
         self.obstacle_sprites = obstacle_sprites
         self.food_sprites = food_sprites
         self.portals = portals
