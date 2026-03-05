@@ -4,19 +4,24 @@ import pygame
 TILE_SIZE = 16
 MAP_COLS = 29
 MAP_ROWS = 31
-
-# Tỷ lệ phóng to (Ví dụ: x2 cho dễ nhìn)
 SCALE = 1.5
 
-# Kích thước thực tế của game
-INTERNAL_WIDTH = MAP_COLS * TILE_SIZE
-INTERNAL_HEIGHT = MAP_ROWS * TILE_SIZE
+# Kích thước nội bộ (Pixel Art gốc)
+INTERNAL_WIDTH = MAP_COLS * TILE_SIZE  # 720
+INTERNAL_HEIGHT = MAP_ROWS * TILE_SIZE # 496
 
-# Kích thước cửa sổ hiển thị
-SCREEN_WIDTH = INTERNAL_WIDTH * SCALE
-SCREEN_HEIGHT = INTERNAL_HEIGHT * SCALE
+# KÍCH THƯỚC CỬA SỔ HIỂN THỊ
+SIDEBAR_WIDTH = 300 # Độ rộng vùng thông tin bên phải
+MAZE_VISIBLE_WIDTH = INTERNAL_WIDTH * SCALE # 1080
+
+SCREEN_WIDTH = MAZE_VISIBLE_WIDTH + SIDEBAR_WIDTH # Tổng: 1380
+SCREEN_HEIGHT = INTERNAL_HEIGHT * SCALE # 744
 
 MAP_PATH = '../data/maps/Map1.tmx'
-PLAYER_PATH = '../images/player/walk.png'
-
 BG_COLOR = '#060606'
+UI_COLOR = '#121212' # Màu nền Sidebar (xám đậm hơn nền game)
+
+ALGO_LIST = ['BFS', 'DFS', 'UCS', 'A*', 'IDS', 'GBFS']
+# Màu sắc bổ sung
+ALGO_BOX_COLOR = '#252525' 
+SELECTED_COLOR = 'yellow'
