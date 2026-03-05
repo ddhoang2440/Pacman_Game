@@ -87,23 +87,36 @@ class Game:
                 change_score = self.change_score                                          
             )
 
-        # 5. Khởi tạo Ghost
-        try:
-            self.ghost_data = self.tmx_data.get_layer_by_name('Ghost')
-            for obj in self.ghost_data:
-                # Tìm đúng đối tượng tên 'Blinky' trong Tiled 
-                if obj.properties.get('ghost_name') == 'Blinky':
-                    self.blinky = Ghost(
-                        pos = (obj.x, obj.y), 
-                        groups = self.visible_sprites, 
-                        obstacle_sprites = self.obstacle_sprites, 
-                        player = self.player
-                    )
-        except ValueError:
-            print("Cảnh báo: Không tìm thấy layer Ghost hoặc đối tượng Blinky!")
+        self.ghost_group = pygame.sprite.Group()
+        configs = [
+            {'name': 'Blinky', 'color': 'red',    'algo': 'BFS'},
+            {'name': 'Pinky',  'color': 'pink',   'algo': 'DFS'},
+            {'name': 'Inky',   'color': 'cyan',   'algo': 'A*'},
+            {'name': 'Clyde',  'color': 'orange', 'algo': 'Minimax'}
+        ]
+    
+        ghost_layer = self.tmx_data.get_layer_by_name('Ghost')
+        spawn_points = [(obj.x, obj.y) for obj in ghost_layer]
+
+        self.ghost_list = []
+        for i, cfg in enumerate(configs):
+            if i < len(spawn_points):
+                ghost = Ghost(
+                    spawn_points[i], 
+                    [self.visible_sprites, self.ghost_group], 
+                    self.obstacle_sprites, 
+                    self.player, 
+                    cfg['name'],   # Tham số thứ 5
+                    cfg['color'],  # Tham số thứ 6
+                    cfg['algo']    # Tham số thứ 7
+                )
+                self.ghost_list.append(ghost) # PHẢI THỤT VÀO TRONG VÒNG LẶP
             
-        # 5. Lưu dữ liệu Ghost để dùng sau này
-        self.ghost_data = self.tmx_data.get_layer_by_name('Ghost')
+        # Kiểm tra nếu danh sách có ma thì mới gán monitored_ghost
+        if self.ghost_list:
+            self.monitored_ghost = self.ghost_list[0]
+        else:
+            self.monitored_ghost = None
 
     def change_score(self, amount):
         self.score += amount
@@ -248,7 +261,10 @@ class Game:
                     for btn_rect, algo_name in self.algo_buttons:
                         if btn_rect.collidepoint(event.pos):
                             self.selected_algo = algo_name
-                            print(f"Algorithm selected: {self.selected_algo}")
+                            # Tìm con ma tương ứng với thuật toán đó để hiển thị thông số
+                            for g in self.ghost_list:
+                                if g.algo_type == algo_name:
+                                    self.monitored_ghost = g
 
             # Logic Update
             if not self.paused:

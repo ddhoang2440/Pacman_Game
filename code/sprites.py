@@ -1,8 +1,7 @@
 # code/sprites.py
 import pygame
 from settings import *
-from algo import get_path_bfs
-
+from algo import *
 class Tile(pygame.sprite.Sprite):
     def __init__(self, pos, groups, surface, sprite_type, gid=None):
         super().__init__(groups)
@@ -14,16 +13,17 @@ class Tile(pygame.sprite.Sprite):
 # code/sprites.py
 
 class Ghost(pygame.sprite.Sprite):
-    def __init__(self, pos, groups, obstacle_sprites, player):
+    def __init__(self, pos, groups, obstacle_sprites, player, name, color, algo_type):
         super().__init__(groups)
         self.image = pygame.Surface((TILE_SIZE, TILE_SIZE))
-        self.image.fill('red')
+        self.image.fill(color) # Mỗi con 1 màu
         self.rect = self.image.get_rect(topleft = pos)
         
         self.player = player
+        self.name = name
         self.obstacle_sprites = obstacle_sprites
+        self.algo_type = algo_type # BFS, DFS, A* hoặc Minimax
         
-        # LOGIC QUAN TRỌNG: Loại bỏ các ô 'door' khỏi danh sách tường của Ma 
         self.walls = set()
         for s in obstacle_sprites:
             if getattr(s, 'sprite_type', 'wall') == 'wall':
@@ -31,7 +31,7 @@ class Ghost(pygame.sprite.Sprite):
         
         self.path = []
         self.timer = 0
-        self.step_delay = 0.3
+        self.step_delay = 0.3 
 
     def calculate_path(self):
         curr_grid = (self.rect.x // TILE_SIZE, self.rect.y // TILE_SIZE)
@@ -40,21 +40,25 @@ class Ghost(pygame.sprite.Sprite):
         in_house = (11 <= curr_grid[0] <= 17) and (12 <= curr_grid[1] <= 16)
         target = (14, 11) if in_house else player_grid
         
-        # KIỂM TRA QUAN TRỌNG: Nếu đích đến là tường, không chạy BFS để tránh treo máy
-        if target in self.walls:
-            self.path = []
-            return 0, 0, 0 
+        if target in self.walls: return 0, 0, 0 
 
-        # Chỉ chạy BFS nếu đích đến hợp lệ
-        self.path, nodes_expanded, exec_time = get_path_bfs(curr_grid, target, self.walls)
-        return nodes_expanded, len(self.path), exec_time
+        # --- CHỌN THUẬT TOÁN ---
+        if self.algo_type == 'BFS':
+            self.path, nodes, time_ms = get_path_bfs(curr_grid, target, self.walls)
+        elif self.algo_type == 'DFS':
+            self.path, nodes, time_ms = get_path_dfs(curr_grid, target, self.walls)
+        elif self.algo_type == 'A*':
+            self.path, nodes, time_ms = get_path_astar(curr_grid, target, self.walls)
+        else: # Minimax
+            self.path, nodes, time_ms = get_path_minimax(curr_grid, target, self.walls)
+            
+        return nodes, len(self.path), time_ms
 
     def update(self, dt):
         self.timer += dt
         if self.timer >= self.step_delay:
             self.calculate_path()
             if len(self.path) > 1:
-                # Di chuyển Ma tới ô kế tiếp
                 next_tile = self.path[1]
                 self.rect.x = next_tile[0] * TILE_SIZE
                 self.rect.y = next_tile[1] * TILE_SIZE
