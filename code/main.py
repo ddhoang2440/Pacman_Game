@@ -42,8 +42,11 @@ class Game:
         self.won = False
         self.show_settings = False
         
-        # --- AI METRICS ---
-        self.selected_algo = 'BFS'
+        # --- AI METRICS & DYNAMIC FILTERING ---
+        # Tự động lấy danh sách thuật toán thực tế từ GHOST_CONFIGS
+        self.active_algos = sorted(list(set(cfg['algo'] for cfg in GHOST_CONFIGS)))
+        self.selected_algo = self.active_algos[0] if self.active_algos else 'BFS'
+        
         self.nodes_expanded = 0
         self.path_cost = 0
         self.exec_time = 0.0
@@ -51,7 +54,7 @@ class Game:
         self.max_depth = 0
         self.search_status = "Ready"
 
-        # --- UI INTERACTION ---
+        # --- UI INTERACTION RECTS ---
         self.algo_buttons = []
         self.pause_rect = pygame.Rect(0, 0, 0, 0)
         self.settings_rect = pygame.Rect(0, 0, 0, 0)
@@ -70,6 +73,7 @@ class Game:
         self.setup()
 
     def setup(self):
+        # [Giữ nguyên logic nạp map và khởi tạo nhân vật của bạn]
         for layer in self.tmx_data.visible_layers:
             if hasattr(layer, 'data'): 
                 for x, y, surf in layer.tiles():
@@ -118,7 +122,7 @@ class Game:
     # --- UI RENDERING HELPERS ---
 
     def draw_ui_card(self, x, y, w, h, title):
-        """Vẽ khung Card chuyên nghiệp với tiêu đề"""
+        """Vẽ khung Card đồng nhất"""
         rect = pygame.Rect(x, y, w, h)
         pygame.draw.rect(self.display_surface, self.colors['card'], rect, border_radius=12)
         pygame.draw.rect(self.display_surface, self.colors['border'], rect, width=1, border_radius=12)
@@ -128,7 +132,7 @@ class Game:
         return rect
 
     def draw_keycap(self, key_text, x, y):
-        """Vẽ phím bấm dạng Keycap"""
+        """Vẽ nút phím kiểu Keycap"""
         txt = self.fonts['keycap'].render(key_text, True, self.colors['highlight'])
         rect = pygame.Rect(x, y, txt.get_width() + 14, 24)
         pygame.draw.rect(self.display_surface, '#252525', rect, border_radius=5)
@@ -146,12 +150,12 @@ class Game:
         # 1. Nền Sidebar
         pygame.draw.rect(self.display_surface, self.colors['sidebar'], (sidebar_x, 0, SIDEBAR_WIDTH, SCREEN_HEIGHT))
 
-        # 2. Tiêu đề PACMAN AI
-        title_surf = self.fonts['title'].render('PACMAN AI', True, self.colors['accent'])
+        # 2. Tiêu đề
+        title_surf = self.fonts['title'].render('NINJA SURVIVOR', True, self.colors['accent'])
         self.display_surface.blit(title_surf, (sidebar_x + padding, curr_y))
         curr_y += 60
 
-        # 3. Card Trạng thái Người chơi
+        # 3. Card STATUS (Lives + Score)
         self.draw_ui_card(sidebar_x + padding, curr_y, card_w, 80, "STATUS")
         for i in range(MAX_LIVES):
             hx = sidebar_x + padding + 15 + (i * 30)
@@ -164,21 +168,24 @@ class Game:
         self.display_surface.blit(score_val, (sidebar_x + padding + card_w - score_val.get_width() - 15, curr_y + 40))
         curr_y += 100
 
-        # 4. Card Hướng dẫn (Đã fix lỗi căn lề)
+        # 4. Card CONTROLS (Fix Alignment)
         self.draw_ui_card(sidebar_x + padding, curr_y, card_w, 120, "CONTROLS")
         ctrls = [("ARROWS", "Move Player"), ("SPACE", "Pause / Resume"), ("R KEY", "Reset Level")]
         for i, (key, desc) in enumerate(ctrls):
             self.draw_keycap(key, sidebar_x + padding + 15, curr_y + 45 + (i * 24))
             desc_surf = self.fonts['diag'].render(desc, True, self.colors['text_dim'])
-            self.display_surface.blit(desc_surf, (sidebar_x + padding + 110, curr_y + 48 + (i * 24)))
+            # Cố định tọa độ X của text mô tả là 120 để thẳng hàng
+            self.display_surface.blit(desc_surf, (sidebar_x + padding + 120, curr_y + 48 + (i * 24)))
         curr_y += 140
 
-        # 5. Card Thuật toán (Grid 2 cột)
-        self.draw_ui_card(sidebar_x + padding, curr_y, card_w, 150, "STRATEGY")
-        algos = ['BFS', 'DFS', 'UCS', 'A*', 'IDS', 'GBFS']
+        # 5. Card STRATEGY (2-Column Grid)
+        num_rows = (len(self.active_algos) + 1) // 2
+        card_h = 60 + (num_rows * 40)
+        self.draw_ui_card(sidebar_x + padding, curr_y, card_w, card_h, "STRATEGY")
+        
         self.algo_buttons = []
         btn_w, btn_h = (card_w // 2) - 20, 32
-        for i, name in enumerate(algos):
+        for i, name in enumerate(self.active_algos):
             col, row = i % 2, i // 2
             bx = sidebar_x + padding + 15 + (col * (btn_w + 10))
             by = curr_y + 45 + (row * (btn_h + 8))
@@ -194,9 +201,9 @@ class Game:
             pygame.draw.rect(self.display_surface, self.colors['accent'] if is_hover else self.colors['border'], btn_rect, width=1, border_radius=6)
             txt_surf = self.fonts['diag'].render(name, True, txt_col)
             self.display_surface.blit(txt_surf, txt_surf.get_rect(center=btn_rect.center))
-        curr_y += 170
+        curr_y += (card_h + 20)
 
-        # 6. Card Thông số AI (Nhãn trái - Giá trị phải)
+        # 6. Card DIAGNOSTICS (Left Label - Right Value)
         self.draw_ui_card(sidebar_x + padding, curr_y, card_w, 140, "DIAGNOSTICS")
         stats = [
             ("Nodes Visited", self.nodes_expanded),
@@ -209,21 +216,20 @@ class Game:
             self.display_surface.blit(lbl_surf, (sidebar_x + padding + 15, curr_y + 45 + (i * 22)))
             val_surf = self.fonts['diag'].render(str(val), True, self.colors['accent'])
             self.display_surface.blit(val_surf, (sidebar_x + padding + card_w - val_surf.get_width() - 15, curr_y + 45 + (i * 22)))
-        curr_y += 160
-
-        # 7. Nút Hành động (Pause & Settings)
+        
+        # 7. Bottom Actions (Fixed relative to bottom)
         self.pause_rect = pygame.Rect(sidebar_x + padding, SCREEN_HEIGHT - 120, card_w, 45)
         self.settings_rect = pygame.Rect(sidebar_x + padding, SCREEN_HEIGHT - 65, card_w, 45)
 
-        # Nút Pause
+        # Pause Button
         p_col = self.colors['danger'] if not self.paused else self.colors['success']
         pygame.draw.rect(self.display_surface, p_col, self.pause_rect, border_radius=10)
         if self.pause_rect.collidepoint(mouse_pos):
             pygame.draw.rect(self.display_surface, 'white', self.pause_rect, width=2, border_radius=10)
-        p_txt = self.fonts['medium'].render("PAUSE / RESUME" if not self.paused else "START SIMULATION", True, 'white')
+        p_txt = self.fonts['medium'].render("PAUSE" if not self.paused else "START SIMULATION", True, 'white')
         self.display_surface.blit(p_txt, p_txt.get_rect(center=self.pause_rect.center))
 
-        # Nút Settings
+        # Settings Button
         pygame.draw.rect(self.display_surface, self.colors['card'], self.settings_rect, border_radius=10)
         pygame.draw.rect(self.display_surface, self.colors['border'], self.settings_rect, width=1, border_radius=10)
         st_txt = self.fonts['medium'].render("GAME SETTINGS", True, 'white')
@@ -266,15 +272,15 @@ class Game:
                         if btn_rect.collidepoint(event.pos):
                             self.selected_algo = algo_name
                             for g in self.ghost_list: 
-                                g.algo_type = algo_name
+                                if g.algo_type == algo_name:
+                                    self.monitored_ghost = g
 
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_r:
-                        self.lives = MAX_LIVES
-                        self.score = 0
-                        self.game_over = False
-                        self.won = False
-                        self.setup()
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_r:
+                    self.lives = MAX_LIVES
+                    self.score = 0
+                    self.game_over = False
+                    self.won = False
+                    self.setup()
 
             # --- LOGIC UPDATE ---
             if not self.paused and not self.game_over and not self.won:
@@ -288,37 +294,35 @@ class Game:
                     self.check_collision()
                     if len(self.food_sprites) == 0: self.won = True
 
-                # Cập nhật số liệu AI
                 if self.monitored_ghost:
-                    nodes, cost, time_val = self.monitored_ghost.calculate_path()
-                    self.nodes_expanded = nodes
-                    self.path_cost = cost
-                    self.exec_time = time_val
-                    self.frontier_size = nodes // 3 
-                    self.max_depth = cost // 2
+                    res = self.monitored_ghost.calculate_path()
+                    # Đảm bảo hàm calculate_path trả về đủ giá trị
+                    if len(res) >= 3:
+                        self.nodes_expanded, self.path_cost, self.exec_time = res[0], res[1], res[2]
+                        # Frontier/Depth giả lập nếu algo không trả về
+                        self.frontier_size = self.nodes_expanded // 3
+                        self.max_depth = self.path_cost // 2
 
-            # --- RENDERING ---
+            # --- RENDERING (FIXED ORDER) ---
             self.display_surface.fill(self.colors['bg'])
 
-            # QUAN TRỌNG: Vẽ các sprite lên internal_surf trước khi scale
-            # Lưu ý: internal_surf.fill(BG_COLOR) đã nằm trong Logic Update phía trên
+            # 1. Vẽ Maze lên mặt phẳng nội bộ TRƯỚC
             self.visible_sprites.draw(self.internal_surf)
 
-            # 1. Phóng to Maze dán sang bên trái
+            # 2. Scale và dán lên màn hình chính
             scaled_maze = pygame.transform.scale(self.internal_surf, (MAZE_VISIBLE_WIDTH, SCREEN_HEIGHT))
             self.display_surface.blit(scaled_maze, (0, 0))
 
-            # 2. Vẽ Sidebar mới
+            # 3. Vẽ Sidebar
             self.draw_sidebar()
 
-            # 3. Overlays (Win/Loss/Countdown)
+            # 4. Overlays
             if self.game_over or self.won:
                 overlay = pygame.Surface((MAZE_VISIBLE_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
                 overlay.fill((0, 0, 0, 180))
                 self.display_surface.blit(overlay, (0, 0))
-                msg = "YOU WIN!" if self.won else "GAME OVER!"
-                col = self.colors['success'] if self.won else self.colors['danger']
-                txt = self.fonts['title'].render(msg, True, col)
+                msg = "MISSION SUCCESS" if self.won else "SYSTEM FAILURE"
+                txt = self.fonts['title'].render(msg, True, self.colors['success'] if self.won else self.colors['danger'])
                 self.display_surface.blit(txt, txt.get_rect(center=(MAZE_VISIBLE_WIDTH//2, SCREEN_HEIGHT//2)))
 
             if self.countdown_active:
