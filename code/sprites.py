@@ -2,6 +2,7 @@ import pygame
 from settings import *
 from algo import *
 from support import import_sprite_sheet
+import math
 
 class Tile(pygame.sprite.Sprite):
     def __init__(self, pos, groups, surface, sprite_type, gid=None):
@@ -45,7 +46,8 @@ class Ghost(pygame.sprite.Sprite):
         self.path = []
         self.timer = 0
         self.recalc_delay = 0.4
-
+        self.spawn_pos = pos
+        
     def import_assets(self):
         self.animations = {'walk': {}, 'attack': {}, 'dead': {}}
         
@@ -66,10 +68,21 @@ class Ghost(pygame.sprite.Sprite):
 
         # 3. Dead animation
         try:
-            dead_frames = import_sprite_sheet(f'{self.folder_path}/Dead.png', 1, 4)
-            self.animations['dead'] = {'down': [dead_frames[0]], 'up': [dead_frames[1]], 
-                                     'left': [dead_frames[2]], 'right': [dead_frames[3]]}
+            # Nạp tấm hình Dead.png (định dạng 1 hàng 1 cột vì chỉ có 1 hình)
+            dead_f = import_sprite_sheet(f'{self.folder_path}/Dead.png', 1, 1)
+            
+            # Lấy tấm hình duy nhất đó bỏ vào list [dead_f[0]]
+            # Gán tấm hình này cho cả 4 hướng để dù đi hướng nào khi chết cũng hiện hình này
+            single_image_list = [dead_f[0]]
+            
+            self.animations['dead'] = {
+                'down':  single_image_list,
+                'up':    single_image_list,
+                'left':  single_image_list,
+                'right': single_image_list
+            }
         except:
+            # Nếu không tìm thấy file Dead.png thì dùng tạm ảnh walk để không bị crash
             self.animations['dead'] = self.animations['walk']
 
     def calculate_path(self):
@@ -77,7 +90,10 @@ class Ghost(pygame.sprite.Sprite):
         player_grid = (self.player.rect.x // TILE_SIZE, self.player.rect.y // TILE_SIZE)
         
         in_house = (11 <= curr_grid[0] <= 17) and (12 <= curr_grid[1] <= 16)
-        target = (14, 11) if in_house else player_grid
+        if in_house:
+            target = (14, 11)
+        else:
+            target = player_grid
 
         if target in self.walls: 
             self.path = []
@@ -126,36 +142,63 @@ class Ghost(pygame.sprite.Sprite):
         self.frame_index += self.animation_speed * dt
         if self.frame_index >= len(current_animation):
             self.frame_index = 0
+        # Lấy ảnh gốc từ danh sách
         self.image = current_animation[int(self.frame_index)]
 
-    def become_scared(self):
-        self.scared = True
-        self.status = 'dead' # Chuyển sang ảnh Dead.png như bạn đã nạp
-        self.speed = SCARED_SPEED
-        self.scared_timer = pygame.time.get_ticks()
+        # --- THÊM HIỆU ỨNG NHẤP NHÁY TẠI ĐÂY ---
+        if self.scared:
+            # math.sin tạo ra giá trị từ -1 đến 1. 
+            # Chúng ta biến nó thành giá trị từ 100 (mờ) đến 255 (đặc)
+            # 0.01 là tốc độ nháy, bạn có thể tăng lên 0.02 nếu muốn nháy nhanh hơn
+            alpha = 150 + (math.sin(pygame.time.get_ticks() * 0.01) * 105)
+            
+            # Tạo một bản sao của ảnh để không làm hỏng ảnh gốc trong bộ nhớ
+            self.image = self.image.copy()
+            self.image.set_alpha(int(alpha))
+        else:
+            # Nếu không sợ thì hiện rõ 100%
+            self.image.set_alpha(255)
+    def reset_to_house(self):
+        # Đưa tọa độ vector và rect về lại tâm nhà ma (vị trí 14, 14 trên grid)
+        # Bạn có thể dùng tọa độ cụ thể tùy theo map của bạn
+        self.pos = pygame.math.Vector2(14 * TILE_SIZE, 14 * TILE_SIZE)
+        self.rect.topleft = (round(self.pos.x), round(self.pos.y))
+        
+        # Sau khi về nhà thì cho ma trở lại bình thường (hết sợ)
+        self.recover()
+    
+    def reset(self):
+        # Đưa ma về vị trí xuất phát của nó trên bản đồ
+        self.pos = pygame.math.Vector2(self.spawn_pos)
+        self.rect.topleft = (round(self.pos.x), round(self.pos.y))
+        
+        # Đưa ma về trạng thái bình thường
+        self.scared = False
+        self.status = 'walk'
+        self.direction = pygame.math.Vector2(0, 0)
+        self.path = [] # Xóa đường đi cũ
 
     def recover(self):
         self.scared = False
-        self.status = 'walk'
         self.speed = self.normal_speed
 
     def update(self, dt):
+        if self.scared:
+            if pygame.time.get_ticks() - self.scared_timer >= POWER_UP_DURATION:
+                self.scared = False
+                self.status = 'walk' # Trở lại bình thường
+
         self.timer += dt
         if self.timer >= self.recalc_delay:
             self.calculate_path()
             self.timer = 0
         
-        if self.scared:
-            current_time = pygame.time.get_ticks()
-            if current_time - self.scared_timer >= POWER_UP_DURATION:
-                self.recover()
 
-        if self.scared:
-            # Logic chạy trốn: Đổi mục tiêu thành một góc xa thay vì đuổi theo Player
-            target = (1, 1) # Ví dụ chạy về góc trên bên trái
-                # Update attack/walk status based on distance to player
-        dist = (pygame.math.Vector2(self.player.rect.center) - pygame.math.Vector2(self.rect.center)).magnitude()
-        self.status = 'attack' if dist < 40 else 'walk'
+
+        if self.scared: self.status = 'dead'
+        else:
+            dist = (pygame.math.Vector2(self.player.rect.center) - pygame.math.Vector2(self.rect.center)).magnitude()
+            self.status = 'attack' if dist < 40 else 'walk'
             
         self.move(dt)
         self.animate(dt)

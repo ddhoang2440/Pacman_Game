@@ -1,46 +1,84 @@
 import pygame
 
-# code/settings.py
+import pygame
+
+# =========================================================
+# DISPLAY & WINDOW SETTINGS
+# =========================================================
 TILE_SIZE = 16
 MAP_COLS = 29
 MAP_ROWS = 31
 SCALE = 1.5
 
-# Kích thước nội bộ (Pixel Art gốc)
-INTERNAL_WIDTH = MAP_COLS * TILE_SIZE  # 720
-INTERNAL_HEIGHT = MAP_ROWS * TILE_SIZE # 496
+# Internal resolution (pixel art gốc)
+INTERNAL_WIDTH = MAP_COLS * TILE_SIZE
+INTERNAL_HEIGHT = MAP_ROWS * TILE_SIZE
 
-# KÍCH THƯỚC CỬA SỔ HIỂN THỊ
-SIDEBAR_WIDTH = 300 # Độ rộng vùng thông tin bên phải
-MAZE_VISIBLE_WIDTH = INTERNAL_WIDTH * SCALE # 1080
+# Sidebar
+SIDEBAR_WIDTH = 520
+MAZE_VISIBLE_WIDTH = INTERNAL_WIDTH * SCALE
 
-SCREEN_WIDTH = MAZE_VISIBLE_WIDTH + SIDEBAR_WIDTH # Tổng: 1380
-SCREEN_HEIGHT = INTERNAL_HEIGHT * SCALE # 744
+# Final window size
+SCREEN_WIDTH = MAZE_VISIBLE_WIDTH + SIDEBAR_WIDTH
+SCREEN_HEIGHT = INTERNAL_HEIGHT * SCALE
 
+
+# =========================================================
+# MAP SETTINGS
+# =========================================================
 MAP_PATH = '../data/maps/Map1.tmx'
-BG_COLOR = '#060606'
-UI_COLOR = '#121212' # Màu nền Sidebar (xám đậm hơn nền game)
 
+
+# =========================================================
+# COLORS & UI THEME
+# =========================================================
+BG_COLOR = '#0f0f0f'        # Deep Dark
+SIDEBAR_BG = '#121212'      # Slightly lighter than bg
+CARD_BG = '#1b1b1b'         # Card surface
+ACCENT = '#1EA7E1'          # Professional Cyan
+GOLD = '#FFD700'            # Score & Highlights
+TEXT_MAIN = '#ffffff'
+TEXT_DIM = '#aaaaaa'        # Secondary labels
+PAUSE_COLOR = '#ff4d00'     # Action Orange
+SUCCESS = '#00FF00'
+VALUE_COLOR = '#00FFFF'
+# --- UI CONSTANTS ---
+CARD_RADIUS = 12
+CARD_PADDING = 20
+# =========================================================
+# ALGORITHMS
+# =========================================================
 ALGO_LIST = ['BFS', 'DFS', 'UCS', 'A*', 'IDS', 'GBFS']
-# Màu sắc bổ sung
-ALGO_BOX_COLOR = '#252525' 
-SELECTED_COLOR = 'yellow'
-ACCENT = '#00BFFF'
-SIDEBAR_BG = '#0f0f0f'
-CARD_BG = '#1c1c1c'
-CARD_BORDER = '#2e2e2e'
-TEXT_DIM = '#aaaaaa'
-ACCENT = '#00BFFF'
 
-# --- UI & Colors ---
-SIDEBAR_BG = '#121212'
-CARD_BG = '#1e1e1e'
-UI_BORDER = '#333333'
-NEON_BLUE = '#00BFFF'
-GOLD = '#FFD700'
 
-# --- Ghost Configs ---
-# Gom folder path và thuật toán vào một chỗ
+# =========================================================
+# PLAYER SETTINGS
+# =========================================================
+PLAYER_SPEED = 110
+PLAYER_ANIM_SPEED = 6
+PLAYER_PATH = '../images/player/Walk.png'
+
+MAX_LIVES = 3
+INVINCIBILITY_DURATION = 2000  # ms
+
+
+# =========================================================
+# POWER UP
+# =========================================================
+POWER_UP_DURATION = 7000  # ms
+
+
+# =========================================================
+# GHOST SETTINGS
+# =========================================================
+GHOST_SPEED = 75
+SCARED_SPEED = 40
+GHOST_HOUSE_POS = (14, 14)
+
+ANIMATION_SPEED = 8
+
+
+# Ghost configs
 GHOST_CONFIGS = [
     {'name': 'EggGirl',    'path': '../images/enemies/EggGirl',    'algo': 'BFS'},
     {'name': 'Eskimo',     'path': '../images/enemies/Eskimo',     'algo': 'Alpha-Beta'},
@@ -48,19 +86,8 @@ GHOST_CONFIGS = [
     {'name': 'Cavegirl',   'path': '../images/enemies/Cavegirl',   'algo': 'Minimax'}
 ]
 
-# --- AI & Animation Settings ---
-THINK_DELAY = 0.4      # Thời gian Ma suy nghĩ (giây)
-ANIMATION_SPEED = 8    # Tốc độ khung hình
-GHOST_SPEED = 75       # Tốc độ Ma di chuyển
 
-POWER_UP_DURATION = 7000 # 7 giây hiệu lực
-SCARED_SPEED = 40        # Ma đi chậm lại khi bị sợ
-POWER_UP_DURATION = 7000  # 7 giây
-GHOST_HOUSE_POS = (14, 14) # Vị trí hồi sinh của Ma
-
-
-# code/settings.py
-PLAYER_SPEED = 110
-PLAYER_ANIM_SPEED = 6
-PLAYER_PATH = '../images/player/Walk.png'
-TILE_SIZE = 16 # Đảm bảo hằng số này có trong settings
+# =========================================================
+# AI SETTINGS
+# =========================================================
+THINK_DELAY = 0.4  # seconds
